@@ -1,0 +1,38 @@
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/vendor/
+/Godeps/
+
+# Go workspace file
+go.work
+
+# IntelliJ specific
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+out/
+
+# Binaries for programs and plugins
+bin/
+pkg/
+
+# Dependency directories
+vendor/
+
+# Output of the go coverage tool
+*.cover
+
+# Log files
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
