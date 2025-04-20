@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +32,9 @@ func main() {
 
 	fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
 
+	// Measure time for client creation
+	clientStartTime := time.Now()
+
 	// Build the config from the kubeconfig file
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
@@ -45,12 +49,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientDuration := time.Since(clientStartTime)
+	fmt.Printf("Time to create K8s client: %v\n", clientDuration)
+
+	// Measure time for listing namespaces
+	listStartTime := time.Now()
+
 	// List namespaces
 	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		fmt.Printf("Error listing namespaces: %v\n", err)
 		os.Exit(1)
 	}
+
+	listDuration := time.Since(listStartTime)
+	fmt.Printf("Time to list namespaces: %v\n", listDuration)
 
 	fmt.Println("Available namespaces:")
 	for i, ns := range namespaces.Items {
