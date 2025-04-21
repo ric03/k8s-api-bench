@@ -11,6 +11,14 @@ Currently, the tool can:
 
 - Connect to a Kubernetes cluster using a kubeconfig file
 - List available namespaces
+- Measure the performance of various API operations used for tab completion in kubectl:
+  - Listing pods in a namespace
+  - Listing deployments in a namespace
+  - Listing services in a namespace
+  - Listing ConfigMaps in a namespace
+  - Listing Secrets in a namespace
+  - Listing API resources
+  - Listing Custom Resource Definitions (simulated)
 
 ## Installation
 
@@ -54,14 +62,26 @@ Currently, the tool can:
 
 ## Usage
 
-Run the tool with the default kubeconfig location:
+Run the tool with the default kubeconfig location and default namespace:
 
 ```bash
 ./k8s-api-bench
 ```
 
-Or specify a custom kubeconfig file:
+Specify a custom kubeconfig file:
 
 ```bash
 ./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig
+```
+
+Specify a namespace to use for the benchmarking operations:
+
+```bash
+./k8s-api-bench --namespace=kube-system
+```
+
+Combine both options:
+
+```bash
+./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig --namespace=kube-system
 ```
