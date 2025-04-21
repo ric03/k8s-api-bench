@@ -142,7 +142,6 @@ func listCRDs(config *rest.Config) error {
 func main() {
 	// Define command-line flags
 	var kubeconfig string
-	var namespace string
 
 	// If the kubeconfig flag is not provided, use the default path
 	home := homedir.HomeDir()
@@ -154,11 +153,9 @@ func main() {
 
 	// Set up the flags
 	flag.StringVar(&kubeconfig, "kubeconfig", defaultKubeconfig, "Path to the kubeconfig file")
-	flag.StringVar(&namespace, "namespace", "default", "Namespace to use for operations")
 	flag.Parse()
 
 	fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
-	fmt.Printf("Using namespace: %s\n", namespace)
 
 	// Measure time for client creation
 	clientStartTime := time.Now()
@@ -201,20 +198,39 @@ func main() {
 	// Benchmark operations used for tab completion
 	fmt.Println("\n--- Tab Completion API Operations Benchmark ---")
 
-	// List pods in the specified namespace
-	measureTime(fmt.Sprintf("list pods in namespace %s", namespace), func() error {
-		return listPods(clientset, namespace)
-	})
+	// Perform namespace-specific operations for each namespace
+	for _, ns := range namespaces.Items {
+		nsName := ns.Name
+		fmt.Printf("\n--- Benchmarking namespace: %s ---\n", nsName)
 
-	// List deployments in the specified namespace
-	measureTime(fmt.Sprintf("list deployments in namespace %s", namespace), func() error {
-		return listDeployments(clientset, namespace)
-	})
+		// List pods in the current namespace
+		measureTime(fmt.Sprintf("list pods in namespace %s", nsName), func() error {
+			return listPods(clientset, nsName)
+		})
 
-	// List services in the specified namespace
-	measureTime(fmt.Sprintf("list services in namespace %s", namespace), func() error {
-		return listServices(clientset, namespace)
-	})
+		// List deployments in the current namespace
+		measureTime(fmt.Sprintf("list deployments in namespace %s", nsName), func() error {
+			return listDeployments(clientset, nsName)
+		})
+
+		// List services in the current namespace
+		measureTime(fmt.Sprintf("list services in namespace %s", nsName), func() error {
+			return listServices(clientset, nsName)
+		})
+
+		// List ConfigMaps in the current namespace
+		measureTime(fmt.Sprintf("list ConfigMaps in namespace %s", nsName), func() error {
+			return listConfigMaps(clientset, nsName)
+		})
+
+		// List Secrets in the current namespace
+		measureTime(fmt.Sprintf("list Secrets in namespace %s", nsName), func() error {
+			return listSecrets(clientset, nsName)
+		})
+	}
+
+	// Non-namespace specific operations
+	fmt.Println("\n--- Non-namespace specific operations ---")
 
 	// List API resources
 	measureTime("list API resources", func() error {
@@ -224,16 +240,6 @@ func main() {
 	// List all API resources
 	measureTime("list all API resources", func() error {
 		return listAllAPIResources(clientset)
-	})
-
-	// List ConfigMaps in the specified namespace
-	measureTime(fmt.Sprintf("list ConfigMaps in namespace %s", namespace), func() error {
-		return listConfigMaps(clientset, namespace)
-	})
-
-	// List Secrets in the specified namespace
-	measureTime(fmt.Sprintf("list Secrets in namespace %s", namespace), func() error {
-		return listSecrets(clientset, namespace)
 	})
 
 	// List Custom Resource Definitions
