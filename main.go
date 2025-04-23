@@ -5,8 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"k8s.io/client-go/discovery"
+	"math"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -17,8 +20,26 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
+// BenchmarkResults stores the results of all benchmark operations
+type BenchmarkResults struct {
+	// Map of operation name to slice of durations
+	Results map[string][]time.Duration
+}
+
+// NewBenchmarkResults creates a new BenchmarkResults instance
+func NewBenchmarkResults() *BenchmarkResults {
+	return &BenchmarkResults{
+		Results: make(map[string][]time.Duration),
+	}
+}
+
+// Add adds a new duration for the specified operation
+func (br *BenchmarkResults) Add(operation string, duration time.Duration) {
+	br.Results[operation] = append(br.Results[operation], duration)
+}
+
 // Helper function to measure the execution time of a function
-func measureTime(name string, f func() error) {
+func measureTime(name string, f func() error, results *BenchmarkResults) {
 	startTime := time.Now()
 	err := f()
 	duration := time.Since(startTime)
@@ -27,6 +48,138 @@ func measureTime(name string, f func() error) {
 		fmt.Printf("Error during %s: %v\n", name, err)
 	} else {
 		fmt.Printf("Time to %s: %v\n", name, duration)
+		// Store the duration in the results
+		results.Add(name, duration)
+	}
+}
+
+// Helper function to run a benchmark operation multiple times
+func runBenchmark(name string, iterations int, f func() error, results *BenchmarkResults) {
+	fmt.Printf("Running benchmark '%s' for %d iterations...\n", name, iterations)
+	for i := 0; i < iterations; i++ {
+		fmt.Printf("Iteration %d/%d: ", i+1, iterations)
+		measureTime(name, f, results)
+	}
+}
+
+// Calculate statistics for the benchmark results
+func (br *BenchmarkResults) CalculateStats() map[string]map[string]time.Duration {
+	stats := make(map[string]map[string]time.Duration)
+
+	for op, durations := range br.Results {
+		if len(durations) == 0 {
+			continue
+		}
+
+		// Sort durations for percentile calculations
+		sort.Slice(durations, func(i, j int) bool {
+			return durations[i] < durations[j]
+		})
+
+		// Calculate statistics
+		var sum time.Duration
+		min := durations[0]
+		max := durations[0]
+
+		for _, d := range durations {
+			sum += d
+			if d < min {
+				min = d
+			}
+			if d > max {
+				max = d
+			}
+		}
+
+		avg := sum / time.Duration(len(durations))
+
+		// Calculate median (50th percentile)
+		median := durations[len(durations)/2]
+		if len(durations)%2 == 0 {
+			median = (durations[len(durations)/2-1] + durations[len(durations)/2]) / 2
+		}
+
+		// Calculate 95th percentile
+		p95Index := int(math.Ceil(float64(len(durations))*0.95)) - 1
+		if p95Index >= len(durations) {
+			p95Index = len(durations) - 1
+		}
+		p95 := durations[p95Index]
+
+		// Store statistics
+		stats[op] = map[string]time.Duration{
+			"min":    min,
+			"max":    max,
+			"avg":    avg,
+			"median": median,
+			"p95":    p95,
+		}
+	}
+
+	return stats
+}
+
+// formatDuration formats a time.Duration to show only one decimal place in milliseconds
+func formatDuration(d time.Duration) string {
+	// Convert to milliseconds with one decimal place
+	ms := float64(d.Microseconds()) / 1e3
+	return fmt.Sprintf("%.1f ms", ms)
+}
+
+// Print the statistics in a readable format
+func (br *BenchmarkResults) PrintStats() {
+	stats := br.CalculateStats()
+
+	// Sort operations for consistent output
+	operations := make([]string, 0, len(stats))
+	for op := range stats {
+		operations = append(operations, op)
+	}
+	sort.Strings(operations)
+
+	// Calculate the maximum length of operation names
+	maxOpLength := 0
+	for _, op := range operations {
+		if len(op) > maxOpLength {
+			maxOpLength = len(op)
+		}
+	}
+
+	// Add some padding to the maximum length
+	opColWidth := maxOpLength + 2
+
+	// Define column width for time values
+	timeColWidth := 12
+
+	fmt.Println("\n--- Benchmark Statistics ---")
+
+	// Create the header with dynamic width
+	headerFormat := fmt.Sprintf("%%-%ds | %%%ds | %%%ds | %%%ds | %%%ds | %%%ds\n",
+		opColWidth, timeColWidth, timeColWidth, timeColWidth, timeColWidth, timeColWidth)
+	fmt.Printf(headerFormat, "Operation", "Min", "Max", "Avg", "Median", "P95")
+
+	// Create the separator line with dynamic width
+	separatorLine := strings.Repeat("-", opColWidth) + "-+" +
+		strings.Repeat("-", timeColWidth+2) + "+" +
+		strings.Repeat("-", timeColWidth+2) + "+" +
+		strings.Repeat("-", timeColWidth+2) + "+" +
+		strings.Repeat("-", timeColWidth+2) + "+" +
+		strings.Repeat("-", timeColWidth+2)
+	fmt.Println(separatorLine)
+
+	// Create the row format with dynamic width
+	rowFormat := fmt.Sprintf("%%-%ds | %%%ds | %%%ds | %%%ds | %%%ds | %%%ds\n",
+		opColWidth, timeColWidth, timeColWidth, timeColWidth, timeColWidth, timeColWidth)
+
+	for _, op := range operations {
+		stat := stats[op]
+		fmt.Printf(rowFormat,
+			op,
+			formatDuration(stat["min"]),
+			formatDuration(stat["max"]),
+			formatDuration(stat["avg"]),
+			formatDuration(stat["median"]),
+			formatDuration(stat["p95"]))
 	}
 }
 
@@ -142,6 +295,7 @@ func listCRDs(config *rest.Config) error {
 func main() {
 	// Define command-line flags
 	var kubeconfig string
+	var iterations int
 
 	// If the kubeconfig flag is not provided, use the default path
 	home := homedir.HomeDir()
@@ -153,12 +307,19 @@ func main() {
 
 	// Set up the flags
 	flag.StringVar(&kubeconfig, "kubeconfig", defaultKubeconfig, "Path to the kubeconfig file")
+	flag.IntVar(&iterations, "iterations", 1, "Number of iterations for each benchmark operation")
 	flag.Parse()
 
-	fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
+	if iterations < 1 {
+		fmt.Println("Error: iterations must be at least 1")
+		os.Exit(1)
+	}
 
-	// Measure time for client creation
-	clientStartTime := time.Now()
+	fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
+	fmt.Printf("Running each benchmark operation for %d iterations\n", iterations)
+
+	// Create benchmark results object
+	benchmarkResults := NewBenchmarkResults()
 
 	// Build the config from the kubeconfig file
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -174,21 +335,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	clientDuration := time.Since(clientStartTime)
-	fmt.Printf("Time to create K8s client: %v\n", clientDuration)
-
-	// Measure time for listing namespaces
-	listStartTime := time.Now()
-
-	// List namespaces
+	// Get namespaces (we need this for later operations)
 	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		fmt.Printf("Error listing namespaces: %v\n", err)
 		os.Exit(1)
 	}
 
-	listDuration := time.Since(listStartTime)
-	fmt.Printf("Time to list namespaces: %v\n", listDuration)
+	// Benchmark listing namespaces
+	runBenchmark("list namespaces", iterations, func() error {
+		_, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		return err
+	}, benchmarkResults)
 
 	fmt.Println("Available namespaces:")
 	for i, ns := range namespaces.Items {
@@ -204,48 +362,51 @@ func main() {
 		fmt.Printf("\n--- Benchmarking namespace: %s ---\n", nsName)
 
 		// List pods in the current namespace
-		measureTime(fmt.Sprintf("list pods in namespace %s", nsName), func() error {
+		runBenchmark(fmt.Sprintf("list pods in namespace %s", nsName), iterations, func() error {
 			return listPods(clientset, nsName)
-		})
+		}, benchmarkResults)
 
 		// List deployments in the current namespace
-		measureTime(fmt.Sprintf("list deployments in namespace %s", nsName), func() error {
+		runBenchmark(fmt.Sprintf("list deployments in namespace %s", nsName), iterations, func() error {
 			return listDeployments(clientset, nsName)
-		})
+		}, benchmarkResults)
 
 		// List services in the current namespace
-		measureTime(fmt.Sprintf("list services in namespace %s", nsName), func() error {
+		runBenchmark(fmt.Sprintf("list services in namespace %s", nsName), iterations, func() error {
 			return listServices(clientset, nsName)
-		})
+		}, benchmarkResults)
 
 		// List ConfigMaps in the current namespace
-		measureTime(fmt.Sprintf("list ConfigMaps in namespace %s", nsName), func() error {
+		runBenchmark(fmt.Sprintf("list ConfigMaps in namespace %s", nsName), iterations, func() error {
 			return listConfigMaps(clientset, nsName)
-		})
+		}, benchmarkResults)
 
 		// List Secrets in the current namespace
-		measureTime(fmt.Sprintf("list Secrets in namespace %s", nsName), func() error {
+		runBenchmark(fmt.Sprintf("list Secrets in namespace %s", nsName), iterations, func() error {
 			return listSecrets(clientset, nsName)
-		})
+		}, benchmarkResults)
 	}
 
 	// Non-namespace specific operations
 	fmt.Println("\n--- Non-namespace specific operations ---")
 
 	// List API resources
-	measureTime("list API resources", func() error {
+	runBenchmark("list API resources", iterations, func() error {
 		return listAPIResources(clientset)
-	})
+	}, benchmarkResults)
 
 	// List all API resources
-	measureTime("list all API resources", func() error {
+	runBenchmark("list all API resources", iterations, func() error {
 		return listAllAPIResources(clientset)
-	})
+	}, benchmarkResults)
 
 	// List Custom Resource Definitions
-	measureTime("list Custom Resource Definitions", func() error {
+	runBenchmark("list Custom Resource Definitions", iterations, func() error {
 		return listCRDs(config)
-	})
+	}, benchmarkResults)
 
 	fmt.Println("\nBenchmarking complete!")
+
+	// Print the benchmark statistics
+	benchmarkResults.PrintStats()
 }

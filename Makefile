@@ -41,7 +41,7 @@ build-windows-amd64:
 # Run the application
 .PHONY: run
 run:
-	$(GO) run .
+	$(GO) run . --iterations 10
 
 # Help target
 .PHONY: help
