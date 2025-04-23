@@ -12,13 +12,13 @@ Currently, the tool can:
 - Connect to a Kubernetes cluster using a kubeconfig file
 - List available namespaces
 - Measure the performance of various API operations used for tab completion in kubectl:
-  - Listing pods in a namespace
-  - Listing deployments in a namespace
-  - Listing services in a namespace
-  - Listing ConfigMaps in a namespace
-  - Listing Secrets in a namespace
-  - Listing API resources
-  - Listing Custom Resource Definitions (simulated)
+    - Listing pods in a namespace
+    - Listing deployments in a namespace
+    - Listing services in a namespace
+    - Listing ConfigMaps in a namespace
+    - Listing Secrets in a namespace
+    - Listing API resources
+    - Listing Custom Resource Definitions (simulated)
 
 ## Installation
 
@@ -85,3 +85,27 @@ Combine both options:
 ```bash
 ./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig --namespace=kube-system
 ```
+
+## Example Output
+
+The test is performed with a local kind cluster.
+
+Below are the performance statistics for various Kubernetes API operations:
+
+```
+--- Benchmark Statistics ---
+Operation                          |          Min |          Max |          Avg |       Median |          P95
+-----------------------------------+--------------+--------------+--------------+--------------+--------------
+list API resources                 |       2.0 ms |       4.3 ms |       2.8 ms |       2.7 ms |       4.3 ms
+list ConfigMaps                    |     198.3 ms |     201.3 ms |     200.0 ms |     200.0 ms |     201.0 ms
+list Custom Resource Definitions   |       1.3 ms |       1.7 ms |       1.4 ms |       1.4 ms |       1.7 ms
+list Secrets                       |     198.7 ms |     201.3 ms |     200.0 ms |     200.0 ms |     200.9 ms
+list all API resources             |       2.0 ms |       3.7 ms |       2.4 ms |       2.2 ms |       3.7 ms
+list deployments                   |       1.3 ms |       2.5 ms |       1.7 ms |       1.7 ms |       2.3 ms
+list namespaces                    |       1.3 ms |     183.5 ms |      19.6 ms |       1.3 ms |     183.5 ms
+list pods                          |     191.5 ms |     207.9 ms |     200.0 ms |     200.0 ms |     201.1 ms
+list services                      |     179.2 ms |     201.3 ms |     198.3 ms |     199.9 ms |     200.7 ms
+```
+
+These statistics show the performance characteristics of different API operations, including minimum, maximum, average,
+median, and 95th percentile response times.
