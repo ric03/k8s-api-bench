@@ -362,27 +362,27 @@ func main() {
 		fmt.Printf("\n--- Benchmarking namespace: %s ---\n", nsName)
 
 		// List pods in the current namespace
-		runBenchmark(fmt.Sprintf("list pods in namespace %s", nsName), iterations, func() error {
+		runBenchmark("list pods", iterations, func() error {
 			return listPods(clientset, nsName)
 		}, benchmarkResults)
 
 		// List deployments in the current namespace
-		runBenchmark(fmt.Sprintf("list deployments in namespace %s", nsName), iterations, func() error {
+		runBenchmark("list deployments", iterations, func() error {
 			return listDeployments(clientset, nsName)
 		}, benchmarkResults)
 
 		// List services in the current namespace
-		runBenchmark(fmt.Sprintf("list services in namespace %s", nsName), iterations, func() error {
+		runBenchmark("list services", iterations, func() error {
 			return listServices(clientset, nsName)
 		}, benchmarkResults)
 
 		// List ConfigMaps in the current namespace
-		runBenchmark(fmt.Sprintf("list ConfigMaps in namespace %s", nsName), iterations, func() error {
+		runBenchmark("list ConfigMaps", iterations, func() error {
 			return listConfigMaps(clientset, nsName)
 		}, benchmarkResults)
 
 		// List Secrets in the current namespace
-		runBenchmark(fmt.Sprintf("list Secrets in namespace %s", nsName), iterations, func() error {
+		runBenchmark("list Secrets", iterations, func() error {
 			return listSecrets(clientset, nsName)
 		}, benchmarkResults)
 	}
