@@ -24,7 +24,7 @@ Currently, the tool can:
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go 1.22 or later (Note: The go.mod file currently specifies Go 1.24, which may need to be updated)
 - Access to a Kubernetes cluster
 - kubectl configured with access to your cluster
 
@@ -32,9 +32,11 @@ Currently, the tool can:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/k8s-api-bench.git
+   git clone https://github.com/[your-username]/k8s-api-bench.git
    cd k8s-api-bench
    ```
+
+   Note: Replace `[your-username]` with your actual GitHub username.
 
 2. Build the binary:
 
@@ -74,23 +76,25 @@ Specify a custom kubeconfig file:
 ./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig
 ```
 
-Specify a namespace to use for the benchmarking operations:
+Specify the number of iterations for each benchmark operation:
 
 ```bash
-./k8s-api-bench --namespace=kube-system
+./k8s-api-bench --iterations=10
 ```
 
 Combine both options:
 
 ```bash
-./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig --namespace=kube-system
+./k8s-api-bench --kubeconfig=/path/to/your/kubeconfig --iterations=10
 ```
+
+Note: The tool automatically runs benchmarks on all available namespaces in the cluster.
 
 ## Example Output
 
 The test is performed with a local kind cluster.
 
-Below are the performance statistics for various Kubernetes API operations:
+Below are the performance statistics for various Kubernetes API operations. Note that your actual results will vary depending on your cluster configuration, resources, and current load:
 
 ```
 --- Benchmark Statistics ---
